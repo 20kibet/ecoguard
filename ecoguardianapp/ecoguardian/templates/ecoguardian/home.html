@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoGuardian - Real Arduino Data</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --secondary: #3b82f6;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --light-bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-light: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            --shadow-hover: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #f8fafc 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Connection Status Banner */
+        .connection-banner {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: white;
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+            animation: pulse-slow 2s infinite;
+        }
+
+        .connection-banner.connected {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            animation: none;
+        }
+
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.85; }
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Dashboard Layout */
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 20px;
+            min-height: calc(100vh - 200px);
+        }
+
+        .left-column, .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Sensor Cards */
+        .sensors-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            height: 180px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 6px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--primary), var(--secondary));
+        }
+
+        .card.alert-card::before {
+            background: linear-gradient(to bottom, var(--danger), #dc2626);
+            animation: pulse-border 2s infinite;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        h3 {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin: auto 0;
+            color: var(--text-primary);
+            text-align: center;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: #f0fdf4;
+            color: var(--primary);
+            border: 1px solid #dcfce7;
+        }
+
+        .status-badge.alert {
+            background: #fef2f2;
+            color: var(--danger);
+            border-color: #fecaca;
+            animation: pulse 2s infinite;
+        }
+
+        .status-badge.warning {
+            background: #fef3c7;
+            color: var(--warning);
+            border-color: #fde68a;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Control Panel */
+        .control-panel {
+            flex: 1;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .control-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            height: 60px;
+        }
+
+        .control-btn:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .control-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .control-btn.auto-activated {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            border-color: var(--warning);
+            animation: glow 2s infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.8); }
+        }
+
+        .control-btn .icon {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 15px;
+        }
+
+        .control-btn .status {
+            font-size: 11px;
+            padding: 3px 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+
+        /* Alert Log */
+        .alert-log-container {
+            flex: 1;
+            min-height: 300px;
+        }
+
+        .alert-log {
+            height: calc(100% - 70px);
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: start;
+            gap: 10px;
+            padding: 12px;
+            background: var(--light-bg);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            border-left: 4px solid var(--primary);
+            font-size: 13px;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert-item.warning {
+            border-left-color: var(--warning);
+            background: #fef3c7;
+        }
+
+        .alert-item.danger {
+            border-left-color: var(--danger);
+            background: #fef2f2;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .alert-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary);
+            color: white;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .alert-item.warning .alert-icon {
+            background: var(--warning);
+        }
+
+        .alert-item.danger .alert-icon {
+            background: var(--danger);
+        }
+
+        .alert-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .alert-time {
+            font-size: 11px;
+            color: var(--text-light);
+        }
+
+        /* Chart */
+        .chart-container {
+            flex: 1;
+            min-height: 300px;
+        }
+
+        .chart-card {
+            height: 100%;
+            padding: 20px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 250px !important;
+        }
+
+        /* Lab Screen Modal */
+        .lab-screen-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lab-screen-modal.show {
+            display: flex;
+        }
+
+        .lab-screen {
+            background: #1e293b;
+            color: white;
+            padding: 40px;
+            border-radius: var(--radius);
+            text-align: center;
+            max-width: 600px;
+            animation: scaleIn 0.3s ease;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .lab-screen h2 {
+            font-size: 48px;
+            color: var(--danger);
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        .lab-screen p {
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+
+        .close-screen {
+            background: white;
+            color: var(--text-primary);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: var(--radius-sm);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            display: none;
+            align-items: center;
+            gap: 12px;
+            border-left: 4px solid var(--primary);
+            z-index: 1000;
+            animation: slideInRight 0.3s ease;
+            max-width: 400px;
+        }
+
+        .toast.show {
+            display: flex;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .updated-time {
+            font-size: 11px;
+            color: var(--text-light);
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .dashboard-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sensors-row {
+                grid-template-columns: 1fr;
+            }
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Connection Status -->
+    <div class="connection-banner" id="connection-status">
+        <div class="status-text">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>Connecting to Django server...</span>
+        </div>
+        <span id="data-source">Waiting...</span>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <div class="logo">
+            <div class="logo-icon">
+                <i class="fas fa-leaf"></i>
+            </div>
+            <div class="header-content">
+                <h1>EcoGuardian Real-Time Monitor</h1>
+                <p class="subtitle">Live Arduino Data → Django API → Dashboard</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard-layout">
+        <!-- Left Column -->
+        <div class="left-column">
+            <!-- Sensor Cards -->
+            <div class="sensors-row">
+                <div class="card" id="temp-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-thermometer-half"></i> Temperature</h3>
+                        <span class="status-badge" id="temp-status">
+                            <i class="fas fa-clock"></i> Waiting
+                        </span>
+                    </div>
+                    <p id="temp" class="stat-value">-- °C</p>
+                    <div class="updated-time" id="temp-time">Waiting for Arduino...</div>
+                </div>
+
+                <div class="card" id="noise-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-volume-up"></i> Noise Level</h3>
+                        <span class="status-badge" id="noise-status">
+                            <i class="fas fa-clock"></i> Waiting
+                        </span>
+                    </div>
+                    <p id="noise" class="stat-value">-- dB</p>
+                    <div class="updated-time" id="noise-time">Waiting for Arduino...</div>
+                </div>
+
+                <div class="card" id="air-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-wind"></i> Air Quality</h3>
+                        <span class="status-badge" id="air-status">
+                            <i class="fas fa-clock"></i> Waiting
+                        </span>
+                    </div>
+                    <p id="air" class="stat-value">-- AQI</p>
+                    <div class="updated-time" id="air-time">Waiting for Arduino...</div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="chart-container">
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-chart-line"></i> Temperature History</h3>
+                        <span class="status-badge">
+                            <i class="fas fa-history"></i> Last 10 readings
+                        </span>
+                    </div>
+                    <canvas id="tempChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="right-column">
+            <!-- Control Panel -->
+            <div class="card control-panel">
+                <div class="card-header">
+                    <h3><i class="fas fa-sliders-h"></i> Automated Control System</h3>
+                    <span class="status-badge">
+                        <i class="fas fa-robot"></i> Auto Mode
+                    </span>
+                </div>
+                
+                <div class="controls-grid">
+                    <button class="control-btn" id="ac-btn">
+                        <span class="icon">
+                            <i class="fas fa-snowflake"></i>
+                            <span>AC System</span>
+                        </span>
+                        <span class="status">OFF</span>
+                    </button>
+
+                    <button class="control-btn" id="ventilation-btn">
+                        <span class="icon">
+                            <i class="fas fa-fan"></i>
+                            <span>Ventilation</span>
+                        </span>
+                        <span class="status">OFF</span>
+                    </button>
+
+                    <button class="control-btn" id="noise-cancel-btn">
+                        <span class="icon">
+                            <i class="fas fa-volume-mute"></i>
+                            <span>Noise Alert</span>
+                        </span>
+                        <span class="status">OFF</span>
+                    </button>
+
+                    <button class="control-btn" id="screen-alert-btn">
+                        <span class="icon">
+                            <i class="fas fa-tv"></i>
+                            <span>Lab Screen</span>
+                        </span>
+                        <span class="status">Ready</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Alert Log -->
+            <div class="card alert-log-container">
+                <div class="card-header">
+                    <h3><i class="fas fa-bell"></i> Activity Log</h3>
+                    <span class="status-badge">
+                        <i class="fas fa-circle"></i> Live
+                    </span>
+                </div>
+                <div class="alert-log" id="alert-log">
+                    <div class="alert-item">
+                        <div class="alert-icon">
+                            <i class="fas fa-info-circle"></i>
+                        </div>
+                        <div class="alert-content">
+                            <div class="alert-title">System Initialized</div>
+                            <div class="alert-time">Waiting for Arduino data...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lab Screen Modal -->
+<div class="lab-screen-modal" id="lab-screen-modal">
+    <div class="lab-screen">
+        <h2>⚠️ NOISE ALERT ⚠️</h2>
+        <p id="noise-message">High noise level detected!</p>
+        <p style="font-size: 18px; color: #94a3b8;">Please keep noise levels down in the lab</p>
+        <button class="close-screen" onclick="closeLabScreen()">Acknowledged</button>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+    <i class="fas fa-check-circle" style="font-size: 20px; color: var(--primary);"></i>
+    <span id="toast-message"></span>
+</div>
+
+<script>
+// Configuration - CHANGE THESE THRESHOLDS AS NEEDED
+const DJANGO_API = 'http://127.0.0.1:8000/api/latest/';
+const POLL_INTERVAL = 2000; // Poll every 2 seconds
+const TEMP_THRESHOLD = 26;   // °C - AC activates above this
+const NOISE_THRESHOLD = 65;  // dB - Alert sent above this
+const AIR_THRESHOLD = 55;    // AQI - Ventilation activates above this
+
+// State
+let tempData = [];
+let labels = [];
+let alerts = [];
+let isConnected = false;
+let autoControlState = {
+    ac: false,
+    ventilation: false,
+    noiseAlert: false
+};
+
+// Chart Setup
+const ctx = document.getElementById('tempChart').getContext('2d');
+const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+gradient.addColorStop(0, 'rgba(16, 185, 129, 0.15)');
+gradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
+
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Temperature (°C)',
+            data: tempData,
+            borderColor: '#10b981',
+            backgroundColor: gradient,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: '#10b981',
+            pointBorderWidth: 2,
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                padding: 8,
+                cornerRadius: 6,
+                callbacks: {
+                    label: function(context) {
+                        return `${context.parsed.y} °C`;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                grid: { color: 'rgba(226, 232, 240, 0.6)' },
+                ticks: { color: '#64748b' },
+                beginAtZero: false
+            },
+            x: {
+                grid: { display: false },
+                ticks: { color: '#64748b', maxRotation: 0 }
+            }
+        }
+    }
+});
+
+// ==================== FETCH REAL DATA FROM DJANGO ====================
+async function fetchDataFromDjango() {
+    try {
+        const response = await fetch(DJANGO_API);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Update connection status
+        if (!isConnected) {
+            updateConnectionStatus(true);
+            addAlert('✅ Connected to Django server', 'info');
+        }
+        
+        // Check if we have device data
+        if (!data.devices || data.devices.length === 0) {
+            console.log('⏳ No Arduino data yet. Waiting...');
+            document.getElementById('data-source').textContent = 'No Arduino data yet';
+            return;
+        }
+        
+        // Get the REAL data from Arduino (via Django)
+        const device = data.devices[0];
+        document.getElementById('data-source').textContent = `Device: ${device.device_id}`;
+        
+        // Update dashboard with REAL Arduino data
+        updateDashboardWithRealData(device);
+        
+    } catch (error) {
+        console.error('❌ Fetch error:', error);
+        if (isConnected) {
+            updateConnectionStatus(false);
+            addAlert('⚠️ Connection lost to Django', 'danger');
+        }
+    }
+}
+
+// ==================== UPDATE DASHBOARD WITH REAL DATA ====================
+function updateDashboardWithRealData(device) {
+    const temp = parseFloat(device.temperature);
+    const noise = parseFloat(device.noise_level);
+    const air = parseFloat(device.air_quality);
+    const timestamp = new Date(device.timestamp);
+    
+    // Update sensor displays
+    document.getElementById('temp').textContent = `${temp.toFixed(1)} °C`;
+    document.getElementById('noise').textContent = `${noise.toFixed(0)} dB`;
+    document.getElementById('air').textContent = `${air.toFixed(0)} AQI`;
+    
+    // Update timestamps
+    const timeStr = timestamp.toLocaleTimeString();
+    document.getElementById('temp-time').textContent = `Updated ${timeStr}`;
+    document.getElementById('noise-time').textContent = `Updated ${timeStr}`;
+    document.getElementById('air-time').textContent = `Updated ${timeStr}`;
+    
+    // Update status badges based on thresholds
+    updateStatusBadge('temp', temp, TEMP_THRESHOLD);
+    updateStatusBadge('noise', noise, NOISE_THRESHOLD);
+    updateStatusBadge('air', air, AIR_THRESHOLD);
+    
+    // Update chart
+    labels.push(timeStr);
+    tempData.push(temp);
+    if (tempData.length > 10) {
+        tempData.shift();
+        labels.shift();
+    }
+    chart.update();
+    
+    // ===== AUTOMATIC CONTROL LOGIC =====
+    checkAndActivateControls(temp, noise, air);
+}
+
+// ==================== STATUS BADGES ====================
+function updateStatusBadge(type, value, threshold) {
+    const badge = document.getElementById(`${type}-status`);
+    const card = document.getElementById(`${type}-card`);
+    
+    if (value > threshold) {
+        badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> HIGH';
+        badge.className = 'status-badge alert';
+        card.classList.add('alert-card');
+    } else if (value > threshold * 0.9) {
+        badge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Elevated';
+        badge.className = 'status-badge warning';
+        card.classList.remove('alert-card');
+    } else {
+        badge.innerHTML = '<i class="fas fa-check-circle"></i> Normal';
+        badge.className = 'status-badge';
+        card.classList.remove('alert-card');
+    }
+}
+
+// ==================== AUTOMATIC CONTROLS ====================
+function checkAndActivateControls(temp, noise, air) {
+    // 1. TEMPERATURE → AC CONTROL
+    if (temp > TEMP_THRESHOLD && !autoControlState.ac) {
+        activateDevice('AC', true);
+        addAlert(`🌡️ High temperature (${temp.toFixed(1)}°C) - AC activated!`, 'warning');
+        showToast(`AC activated automatically - Temp: ${temp.toFixed(1)}°C`);
+    } else if (temp <= TEMP_THRESHOLD - 2 && autoControlState.ac) {
+        deactivateDevice('AC');
+        addAlert(`✅ Temperature normalized (${temp.toFixed(1)}°C) - AC off`, 'info');
+    }
+    
+    // 2. AIR QUALITY → VENTILATION CONTROL
+    if (air > AIR_THRESHOLD && !autoControlState.ventilation) {
+        activateDevice('FAN', true);
+        addAlert(`💨 Poor air (${air.toFixed(0)} AQI) - Ventilation activated!`, 'warning');
+        showToast(`Ventilation activated - Air: ${air.toFixed(0)} AQI`);
+    } else if (air <= AIR_THRESHOLD - 5 && autoControlState.ventilation) {
+        deactivateDevice('FAN');
+        addAlert(`✅ Air quality improved (${air.toFixed(0)} AQI) - Ventilation off`, 'info');
+    }
+    
+    // 3. NOISE → LAB SCREEN ALERT
+    if (noise > NOISE_THRESHOLD && !autoControlState.noiseAlert) {
+        activateDevice('NOISE', true);
+        sendLabScreenAlert(noise);
+        addAlert(`🔊 HIGH NOISE (${noise.toFixed(0)} dB) - Lab screen alerted!`, 'danger');
+        showToast(`⚠️ NOISE ALERT sent to lab screen: ${noise.toFixed(0)} dB`, 'warning');
+    } else if (noise <= NOISE_THRESHOLD - 5 && autoControlState.noiseAlert) {
+        deactivateDevice('NOISE');
+        addAlert(`🔇 Noise normalized (${noise.toFixed(0)} dB)`, 'info');
+    }
+}
+
+// ==================== DEVICE ACTIVATION ====================
+function activateDevice(deviceType, isAuto = false) {
+    const btnMap = {
+        'AC': 'ac-btn',
+        'FAN': 'ventilation-btn',
+        'NOISE': 'noise-cancel-btn'
+    };
+    
+    const btn = document.getElementById(btnMap[deviceType]);
+    btn.classList.remove('active');
+    btn.classList.add('auto-activated');
+    btn.querySelector('.status').textContent = isAuto ? 'AUTO' : 'ON';
+    
+    const stateMap = { 'AC': 'ac', 'FAN': 'ventilation', 'NOISE': 'noiseAlert' };
+    autoControlState[stateMap[deviceType]] = true;
+}
+
+function deactivateDevice(deviceType) {
+    const btnMap = {
+        'AC': 'ac-btn',
+        'FAN': 'ventilation-btn',
+        'NOISE': 'noise-cancel-btn'
+    };
+    
+    const btn = document.getElementById(btnMap[deviceType]);
+    btn.classList.remove('active', 'auto-activated');
+    btn.querySelector('.status').textContent = 'OFF';
+    
+    const stateMap = { 'AC': 'ac', 'FAN': 'ventilation', 'NOISE': 'noiseAlert' };
+    autoControlState[stateMap[deviceType]] = false;
+}
+
+// ==================== LAB SCREEN ALERT ====================
+function sendLabScreenAlert(noiseLevel) {
+    const screenBtn = document.getElementById('screen-alert-btn');
+    screenBtn.classList.add('auto-activated');
+    screenBtn.querySelector('.status').textContent = 'SENT';
+    
+    // Show lab screen modal
+    document.getElementById('noise-message').textContent = 
+        `Noise level: ${noiseLevel.toFixed(0)} dB (Threshold: ${NOISE_THRESHOLD} dB)`;
+    document.getElementById('lab-screen-modal').classList.add('show');
+    
+    setTimeout(() => {
+        screenBtn.classList.remove('auto-activated');
+        screenBtn.querySelector('.status').textContent = 'Ready';
+    }, 5000);
+}
+
+function closeLabScreen() {
+    document.getElementById('lab-screen-modal').classList.remove('show');
+}
+
+// ==================== CONNECTION STATUS ====================
+function updateConnectionStatus(connected) {
+    isConnected = connected;
+    const banner = document.getElementById('connection-status');
+    const statusText = banner.querySelector('.status-text span');
+    const icon = banner.querySelector('i');
+    
+    if (connected) {
+        banner.classList.add('connected');
+        icon.className = 'fas fa-check-circle';
+        statusText.textContent = 'Connected to Django • Receiving REAL Arduino data';
+    } else {
+        banner.classList.remove('connected');
+        icon.className = 'fas fa-exclamation-triangle';
+        statusText.textContent = 'Connection lost • Retrying...';
+    }
+}
+
+// ==================== ALERTS & TOASTS ====================
+function addAlert(message, type = 'info') {
+    const now = new Date();
+    const alert = {
+        message: message,
+        type: type,
+        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    };
+    
+    alerts.unshift(alert);
+    if (alerts.length > 10) alerts.pop();
+    
+    updateAlertLog();
+}
+
+function updateAlertLog() {
+    const logContainer = document.getElementById('alert-log');
+    
+    const iconMap = {
+        'info': 'fa-info-circle',
+        'warning': 'fa-exclamation-triangle',
+        'danger': 'fa-exclamation-circle'
+    };
+    
+    logContainer.innerHTML = alerts.map(alert => `
+        <div class="alert-item ${alert.type}">
+            <div class="alert-icon">
+                <i class="fas ${iconMap[alert.type]}"></i>
+            </div>
+            <div class="alert-content">
+                <div class="alert-title">${alert.message}</div>
+                <div class="alert-time">${alert.time}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
+    
+    toastMessage.textContent = message;
+    toast.className = `toast show ${type}`;
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 4000);
+}
+
+// ==================== INITIALIZE ====================
+console.log('🚀 EcoGuardian Real-Time Monitor Started');
+console.log(`📡 Fetching data from: ${DJANGO_API}`);
+console.log(`🔄 Poll interval: ${POLL_INTERVAL}ms`);
+console.log(`🌡️ Temp threshold: ${TEMP_THRESHOLD}°C`);
+console.log(`💨 Air threshold: ${AIR_THRESHOLD} AQI`);
+console.log(`🔊 Noise threshold: ${NOISE_THRESHOLD} dB`);
+
+addAlert('System started - Connecting to Django...', 'info');
+
+// Start polling Django API for REAL Arduino data
+fetchDataFromDjango();
+setInterval(fetchDataFromDjango, POLL_INTERVAL);
+</script>
+
+</body>
+</html>

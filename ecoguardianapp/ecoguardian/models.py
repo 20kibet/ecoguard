@@ -1,28 +1,61 @@
-# models.py - Enhanced with control systems
+# models.py - FIXED & INTEGRATED
 
 from django.db import models
 from django.utils import timezone
+from datetime import timedelta
 
-class SensorReading(models.Model):
-    temperature = models.FloatField()
-    noise = models.FloatField()
-    air_quality = models.FloatField()
+class EcoGuardianDevice(models.Model):
+    """IoT devices registered in the system"""
+    device_id = models.CharField(max_length=100, unique=True, primary_key=True)
+    device_name = models.CharField(max_length=200)
+    location = models.CharField(max_length=200)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.device_name} ({self.location})"
+    
+    def is_online(self):
+        """Device is online if last seen within 5 minutes"""
+        return self.last_seen >= timezone.now() - timedelta(minutes=5)
+
+
+class EnvironmentalData(models.Model):
+    """Sensor readings with AI analysis"""
+    device = models.ForeignKey(EcoGuardianDevice, on_delete=models.CASCADE, related_name='readings')
     timestamp = models.DateTimeField(auto_now_add=True)
     
-    # Automated responses triggered
+    # Sensor readings
+    temperature = models.FloatField()
+    air_quality = models.FloatField()
+    noise_level = models.FloatField()
+    
+    # AI Analysis results
+    ai_score = models.FloatField(null=True, blank=True)
+    anomaly_type = models.CharField(max_length=50, null=True, blank=True)
+    is_anomaly = models.BooleanField(default=False)
+    
+    # System status
+    system_status = models.CharField(max_length=20, default='normal')
+    
+    # Automated responses (from your automation system)
     ac_activated = models.BooleanField(default=False)
     ventilation_activated = models.BooleanField(default=False)
     alert_sent = models.BooleanField(default=False)
-
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
     def __str__(self):
-        return f"[{self.timestamp.strftime('%H:%M:%S')}] T:{self.temperature}°C N:{self.noise}dB AQ:{self.air_quality}"
-
+        return f"[{self.timestamp.strftime('%H:%M:%S')}] {self.device.device_name} - T:{self.temperature}°C"
+    
     class Meta:
         ordering = ['-timestamp']
+        verbose_name_plural = "Environmental Data"
 
 
 class ControlDevice(models.Model):
-    """Track all controllable devices in the system"""
+    """Controllable devices (AC, fans, alarms)"""
     DEVICE_TYPES = [
         ('AC', 'Air Conditioner'),
         ('FAN', 'Ventilation Fan'),
@@ -41,12 +74,20 @@ class ControlDevice(models.Model):
 
 
 class AlertLog(models.Model):
-    """Log all alerts sent"""
+    """Alert logs for notifications"""
     ALERT_TYPES = [
         ('TEMP_HIGH', 'High Temperature'),
         ('NOISE_HIGH', 'High Noise Level'),
         ('AIR_POOR', 'Poor Air Quality'),
+        ('ANOMALY', 'AI Detected Anomaly'),
         ('MULTIPLE', 'Multiple Alerts'),
+    ]
+    
+    SEVERITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('critical', 'Critical'),
     ]
     
     ALERT_CHANNELS = [
@@ -55,28 +96,24 @@ class AlertLog(models.Model):
         ('SCREEN', 'C4DLab Screen'),
         ('WHATSAPP', 'WhatsApp'),
         ('SYSTEM', 'System Notification'),
-        ('GUARD', 'Security Guard'),
     ]
     
+    data = models.ForeignKey(EnvironmentalData, on_delete=models.CASCADE, related_name='alerts', null=True, blank=True)
     alert_type = models.CharField(max_length=20, choices=ALERT_TYPES)
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='medium')
     channel = models.CharField(max_length=20, choices=ALERT_CHANNELS)
     message = models.TextField()
     recipient = models.CharField(max_length=100)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    acknowledged = models.BooleanField(default=False)
-    acknowledged_at = models.DateTimeField(null=True, blank=True)
     
-    sensor_reading = models.ForeignKey(
-        SensorReading, 
-        on_delete=models.CASCADE, 
-        related_name='alerts'
-    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_resolved = models.BooleanField(default=False)
+    resolved_at = models.DateTimeField(null=True, blank=True)
     
     def __str__(self):
-        return f"{self.get_alert_type_display()} via {self.channel} at {self.timestamp.strftime('%H:%M:%S')}"
+        return f"{self.get_alert_type_display()} - {self.severity} at {self.created_at.strftime('%H:%M:%S')}"
     
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ['-created_at']
 
 
 class SystemConfiguration(models.Model):
@@ -94,9 +131,10 @@ class SystemConfiguration(models.Model):
     auto_ac_enabled = models.BooleanField(default=True)
     auto_ventilation_enabled = models.BooleanField(default=True)
     alerts_enabled = models.BooleanField(default=True)
+    ai_analysis_enabled = models.BooleanField(default=True)
     
-    # Alert cooldown (prevent spam)
-    alert_cooldown_minutes = models.IntegerField(default=5, help_text="Minutes between repeated alerts")
+    # Alert cooldown
+    alert_cooldown_minutes = models.IntegerField(default=5)
     
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -106,17 +144,37 @@ class SystemConfiguration(models.Model):
     class Meta:
         verbose_name = "System Configuration"
         verbose_name_plural = "System Configuration"
+    
+    def save(self, *args, **kwargs):
+        # Ensure only one config exists
+        if not self.pk and SystemConfiguration.objects.exists():
+            raise ValueError("Only one SystemConfiguration instance allowed")
+        return super().save(*args, **kwargs)
+
+
+class AITrainingModel(models.Model):
+    """Store AI model metadata"""
+    device = models.ForeignKey(EcoGuardianDevice, on_delete=models.CASCADE)
+    model_version = models.CharField(max_length=50)
+    training_date = models.DateTimeField(auto_now_add=True)
+    accuracy = models.FloatField(null=True, blank=True)
+    samples_trained = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return f"{self.device.device_name} - v{self.model_version}"
+    
+    class Meta:
+        ordering = ['-training_date']
 
 
 class ExamSchedule(models.Model):
-    """Track exam schedules for stricter monitoring"""
+    """Exam schedules for stricter monitoring"""
     exam_name = models.CharField(max_length=200)
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     room = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
-    
-    # Stricter thresholds during exams
     strict_noise_threshold = models.FloatField(default=50.0)
     
     def __str__(self):
@@ -128,3 +186,5 @@ class ExamSchedule(models.Model):
     
     class Meta:
         ordering = ['-start_time']
+
+        
